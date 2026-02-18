@@ -1,0 +1,56 @@
+#!/bin/bash
+
+if [[ $EUID -ne 0 ]]; then
+   echo "Error: This script must be run with sudo: \"sudo $0\""
+   exit 1
+fi
+
+# Manually defined array of apps
+# (Add or remove names here as needed)
+apps=(
+    "fzf"
+    "bat"
+    "uv"
+    "git"
+    "git-lfs"
+    "docker-ce"
+    "docker-ce-cli"
+    "btop"
+    "xclip"
+    "git"
+    "neovim"
+    "fastfetch"
+    "tmux"
+    "neovim"
+    "xclip"
+)
+
+# Detect the OS / Package Manager
+if command -v dnf &> /dev/null; then
+    PKG_MANAGER="dnf"
+    INSTALL_CMD="sudo dnf install -y"
+elif command -v apt-get &> /dev/null; then
+    PKG_MANAGER="apt"
+    # Note: apt-get is used for better script compatibility than 'apt'
+    INSTALL_CMD="sudo apt-get install -y"
+else
+    echo "Error: Neither dnf nor apt-get found on this system."
+    exit 1
+fi
+
+echo "--- Detected $PKG_MANAGER System ---"
+
+# Iterate through the array
+for app in "${apps[@]}"; do
+    # Check if the binary exists in the system PATH
+    if command -v "$app" &> /dev/null; then
+        echo "[SKIP] '$app' is already installed."
+    else
+        echo "[INSTALLING] '$app'..."
+        # Execute the install command
+        $INSTALL_CMD "$app"
+    fi
+done
+
+echo "--- Installation complete ---"
+
