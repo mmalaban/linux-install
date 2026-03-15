@@ -5,6 +5,22 @@ if [[ $EUID -ne 0 ]]; then
    exit 1
 fi
 
+DRY_RUN=false
+while getopts "n" opt; do
+    case $opt in
+        n) DRY_RUN=true ;;
+        *) echo "Usage: sudo $0 [-n]"; exit 1 ;;
+    esac
+done
+
+run_cmd() {
+    if [ "$DRY_RUN" = true ]; then
+        echo "[DRY RUN] $*"
+    else
+        "$@"
+    fi
+}
+
 # Manually defined array of apps
 # (Add or remove names here as needed)
 apps=(
@@ -25,7 +41,7 @@ apps=(
 # Detect the OS / Package Manager
 if command -v dnf &> /dev/null; then
     PKG_MANAGER="dnf"
-    INSTALL_CMD="sudo dnf install -y"
+    INSTALL_CMD="dnf install -y"
 else
     echo "Error: dnf not found on this system."
     exit 1
@@ -38,8 +54,8 @@ if command -v lazygit &> /dev/null; then
     echo "[SKIP] 'lazygit' is already installed."
 else
     echo "[INSTALLING] 'lazygit' via COPR..."
-    sudo dnf copr enable -y dejan/lazygit
-    sudo dnf install -y lazygit
+    run_cmd dnf copr enable -y dejan/lazygit
+    run_cmd dnf install -y lazygit
 fi
 
 # Iterate through the array
@@ -50,9 +66,240 @@ for app in "${apps[@]}"; do
     else
         echo "[INSTALLING] '$app'..."
         # Execute the install command
-        $INSTALL_CMD "$app"
+        run_cmd $INSTALL_CMD "$app"
     fi
 done
 
 echo "--- Installation complete ---"
 
+# --- Setup ~/.bashrc.d config files ---
+USER_HOME=$(eval echo ~$SUDO_USER)
+BASHRC_D="$USER_HOME/.bashrc.d"
+
+echo "--- Setting up $BASHRC_D config files ---"
+run_cmd mkdir -p "$BASHRC_D"
+
+if [ "$DRY_RUN" = true ]; then
+    echo "[DRY RUN] Would create file: $BASHRC_D/welcome"
+else
+    cat > "$BASHRC_D/welcome" << 'EOF'
+# echo -e "\e[1;33mTo update, use command \"update-all\"\e[0m"
+sleep 0.5
+clear
+EOF
+fi
+
+if [ "$DRY_RUN" = true ]; then
+    echo "[DRY RUN] Would create file: $BASHRC_D/customize"
+else
+    cat > "$BASHRC_D/customize" << 'EOF'
+eval "$(fzf --bash)"
+EOF
+fi
+
+if [ "$DRY_RUN" = true ]; then
+    echo "[DRY RUN] Would create file: $BASHRC_D/aliases"
+else
+    cat > "$BASHRC_D/aliases" << 'EOF'
+alias update-all="sudo dnf update -y && flatpak update -y"
+alias ff="fastfetch -c ~/.config/fastfetch/12.jsonc"
+alias la="ls -A"
+alias ll="ls -lA"
+alias clipboard="xclip -selection clipboard"
+alias vim="nvim"
+alias ag="antigravity"
+alias cat="bat --theme Dracula"
+# git aliases
+alias gs="git status"
+alias gc="git commit -m"
+alias gitinfo="git config user.name mmalabanan && git config user.email mmalaban@hotmail.com"
+alias lg="lazygit"
+# Overriding the system mkdir
+mkdir() {
+    command mkdir -p "$1" && cd "$1"
+}
+EOF
+fi
+
+if [ "$DRY_RUN" = true ]; then
+    echo "[DRY RUN] Would create file: $BASHRC_D/tmux"
+else
+    cat > "$BASHRC_D/tmux" << 'EOF'
+tmux new -s startup
+EOF
+fi
+
+run_cmd chown -R "$SUDO_USER:$SUDO_USER" "$BASHRC_D"
+echo "--- $BASHRC_D config files created ---"
+
+# --- Setup ~/.config/fastfetch config ---
+FASTFETCH_DIR="$USER_HOME/.config/fastfetch"
+
+echo "--- Setting up $FASTFETCH_DIR config ---"
+run_cmd mkdir -p "$FASTFETCH_DIR"
+
+if [ "$DRY_RUN" = true ]; then
+    echo "[DRY RUN] Would create file: $FASTFETCH_DIR/12.jsonc"
+else
+    cat > "$FASTFETCH_DIR/12.jsonc" << 'EOF'
+{
+    "$schema": "https://github.com/fastfetch-cli/fastfetch/raw/dev/doc/json_schema.json",
+    "logo": {
+        "type": "none"
+    },
+    "display": {
+        "separator": "->   ",
+        "color": {
+            "separator": "1"
+        }
+    },
+    "modules": [
+        {
+            "type": "title",
+            "format": "                                {6}{7}{8}"
+        },
+        "break",
+        {
+            "type": "custom",
+            "format": "┌───────────────────────────── {#1}System Information{#} ─────────────────────────────┐"
+        },
+        "break",
+        {
+            "key": "     OS           ",
+            "keyColor": "red",
+            "type": "os"
+        },
+        {
+            "key": "    󰌢 Machine      ",
+            "keyColor": "green",
+            "type": "host"
+        },
+        {
+            "key": "     Kernel       ",
+            "keyColor": "magenta",
+            "type": "kernel"
+        },
+        {
+            "key": "    󰅐 Uptime       ",
+            "keyColor": "red",
+            "type": "uptime"
+        },
+        {
+            "key": "     Packages     ",
+            "keyColor": "cyan",
+            "type": "packages",
+        },
+        {
+            "key": "    󰍹 Resolution   ",
+            "keyColor": "yellow",
+            "type": "display",
+            "compactType": "original-with-refresh-rate"
+        },
+        {
+            "key": "     WM           ",
+            "keyColor": "blue",
+            "type": "wm"
+        },
+        {
+            "key": "     DE           ",
+            "keyColor": "green",
+            "type": "de"
+        },
+        {
+            "key": "     Shell        ",
+            "keyColor": "cyan",
+            "type": "shell"
+        },
+        {
+            "key": "     Terminal     ",
+            "keyColor": "red",
+            "type": "terminal"
+        },
+        {
+            "key": "    󰻠 CPU          ",
+            "keyColor": "yellow",
+            "type": "cpu"
+        },
+        {
+            "key": "    󰍛 GPU          ",
+            "keyColor": "blue",
+            "type": "gpu"
+        },
+        {
+            "key": "     Disk         ",
+            "keyColor": "green",
+            "type": "disk"
+        },
+        {
+            "key": "    󰑭 Memory       ",
+            "keyColor": "magenta",
+            "type": "memory"
+        },
+        "break",
+        {
+            "type": "custom",
+            "format": "└──────────────────────────────────────────────────────────────────────────────┘"
+        },
+        "break",
+        {
+            "type": "colors",
+            "paddingLeft": 34,
+            "symbol": "circle"
+        }
+    ]
+}
+EOF
+fi
+
+run_cmd chown -R "$SUDO_USER:$SUDO_USER" "$FASTFETCH_DIR"
+echo "--- $FASTFETCH_DIR config created ---"
+
+# --- Install Meslo Nerd Font ---
+FONT_DIR="$USER_HOME/.local/share/fonts"
+
+echo "--- Installing Meslo Nerd Font ---"
+if fc-list | grep -qi "meslo"; then
+    echo "[SKIP] Meslo Nerd Font is already installed."
+else
+    run_cmd mkdir -p "$FONT_DIR"
+    TEMP_ZIP=$(mktemp /tmp/MesloNF.XXXXXX.zip)
+    run_cmd curl -Lo "$TEMP_ZIP" "https://github.com/ryanoasis/nerd-fonts/releases/latest/download/Meslo.zip"
+    run_cmd unzip -o "$TEMP_ZIP" -d "$FONT_DIR"
+    run_cmd rm "$TEMP_ZIP"
+    run_cmd chown -R "$SUDO_USER:$SUDO_USER" "$FONT_DIR"
+    run_cmd fc-cache -fv
+    echo "--- Meslo Nerd Font installed ---"
+fi
+
+# --- Setup ~/.config/tmux config ---
+TMUX_DIR="$USER_HOME/.config/tmux"
+
+echo "--- Setting up $TMUX_DIR config ---"
+run_cmd mkdir -p "$TMUX_DIR"
+
+if [ "$DRY_RUN" = true ]; then
+    echo "[DRY RUN] Would create file: $TMUX_DIR/tmux.conf"
+else
+    cat > "$TMUX_DIR/tmux.conf" << 'EOF'
+# default bind key is ctrl+b
+
+# reloads the tmux configuration file
+bind r source-file ~/.config/tmux/tmux.conf \; display-message "~/.config/tmux/tmux.conf reloaded"
+
+# General
+set -g set-clipboard on         # Use system clipboard
+set -g detach-on-destroy off    # Don't exit from tmux when closing a session
+set -g history-limit 1000000    # Increase history size (from 2,000)
+set -g mouse on                 # Enable mouse support
+set -g allow-passthrough on     # Allow programs in the pane to bypass tmux (e.g. for image preview)
+
+# puts the status bar on top
+set -g status-position top
+
+# pop-up window - lazygit
+bind C-g display-popup -d "#{pane_current_path}" -w 80% -h 80% -E "lazygit"
+EOF
+fi
+
+run_cmd chown -R "$SUDO_USER:$SUDO_USER" "$TMUX_DIR"
+echo "--- $TMUX_DIR config created ---"
