@@ -16,7 +16,6 @@ apps=(
     "fzf"
     "git"
     "git-lfs"
-    "lazygit"
     "neovim"
     "pdftk-java"
     "uv"
@@ -33,6 +32,15 @@ else
 fi
 
 echo "--- Detected $PKG_MANAGER System ---"
+
+# Install lazygit via COPR
+if command -v lazygit &> /dev/null; then
+    echo "[SKIP] 'lazygit' is already installed."
+else
+    echo "[INSTALLING] 'lazygit' via COPR..."
+    sudo dnf copr enable -y dejan/lazygit
+    sudo dnf install -y lazygit
+fi
 
 # Iterate through the array
 for app in "${apps[@]}"; do
