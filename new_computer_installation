@@ -33,8 +33,6 @@ apps=(
     "git"
     "git-lfs"
     "neovim"
-    "pdftk-java"
-    "uv"
     "xclip"
 )
 
@@ -42,20 +40,57 @@ apps=(
 if command -v dnf &> /dev/null; then
     PKG_MANAGER="dnf"
     INSTALL_CMD="dnf install -y"
+    UPDATE_CMD="sudo dnf update -y && flatpak update -y"
+    apps+=("pdftk-java" "uv")
+elif command -v apt &> /dev/null; then
+    PKG_MANAGER="apt"
+    INSTALL_CMD="apt install -y"
+    UPDATE_CMD="sudo apt update && sudo apt upgrade -y && flatpak update -y"
+    apps+=("pdftk")
 else
-    echo "Error: dnf not found on this system."
+    echo "Error: No supported package manager (dnf, apt) found on this system."
     exit 1
 fi
 
 echo "--- Detected $PKG_MANAGER System ---"
 
-# Install lazygit via COPR
+# Update apt package cache before installing
+if [ "$PKG_MANAGER" = "apt" ]; then
+    echo "--- Updating apt package cache ---"
+    run_cmd apt update -y
+fi
+
+# Install lazygit
 if command -v lazygit &> /dev/null; then
     echo "[SKIP] 'lazygit' is already installed."
 else
-    echo "[INSTALLING] 'lazygit' via COPR..."
-    run_cmd dnf copr enable -y dejan/lazygit
-    run_cmd dnf install -y lazygit
+    if [ "$PKG_MANAGER" = "dnf" ]; then
+        echo "[INSTALLING] 'lazygit' via COPR..."
+        run_cmd dnf copr enable -y dejan/lazygit
+        run_cmd dnf install -y lazygit
+    elif [ "$PKG_MANAGER" = "apt" ]; then
+        echo "[INSTALLING] 'lazygit' via GitHub release..."
+        LAZYGIT_VERSION=$(curl -s "https://api.github.com/repos/jesseduffield/lazygit/releases/latest" | grep -Po '"tag_name": "v\K[^"]*')
+        TEMP_DIR=$(mktemp -d)
+        run_cmd curl -Lo "$TEMP_DIR/lazygit.tar.gz" "https://github.com/jesseduffield/lazygit/releases/latest/download/lazygit_${LAZYGIT_VERSION}_Linux_x86_64.tar.gz"
+        run_cmd tar -xf "$TEMP_DIR/lazygit.tar.gz" -C "$TEMP_DIR" lazygit
+        run_cmd install "$TEMP_DIR/lazygit" /usr/local/bin/lazygit
+        run_cmd rm -rf "$TEMP_DIR"
+    fi
+fi
+
+# Install uv via official installer on apt (not in apt repos)
+if [ "$PKG_MANAGER" = "apt" ]; then
+    if command -v uv &> /dev/null; then
+        echo "[SKIP] 'uv' is already installed."
+    else
+        echo "[INSTALLING] 'uv' via official installer..."
+        if [ "$DRY_RUN" = true ]; then
+            echo "[DRY RUN] curl -LsSf https://astral.sh/uv/install.sh | sh"
+        else
+            curl -LsSf https://astral.sh/uv/install.sh | sh
+        fi
+    fi
 fi
 
 # Iterate through the array
@@ -100,8 +135,8 @@ fi
 if [ "$DRY_RUN" = true ]; then
     echo "[DRY RUN] Would create file: $BASHRC_D/aliases"
 else
-    cat > "$BASHRC_D/aliases" << 'EOF'
-alias update-all="sudo dnf update -y && flatpak update -y"
+    cat > "$BASHRC_D/aliases" << EOF
+alias update-all="$UPDATE_CMD"
 alias ff="fastfetch -c ~/.config/fastfetch/12.jsonc"
 alias la="ls -A"
 alias ll="ls -lA"
@@ -116,7 +151,7 @@ alias gitinfo="git config user.name mmalabanan && git config user.email mmalaban
 alias lg="lazygit"
 # Overriding the system mkdir
 mkdir() {
-    command mkdir -p "$1" && cd "$1"
+    command mkdir -p "\$1" && cd "\$1"
 }
 EOF
 fi
