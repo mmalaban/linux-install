@@ -500,4 +500,41 @@ EOF
 fi
 
 run_cmd chown -R "$SUDO_USER:$SUDO_USER" "$OMP_DIR"
-echo "--- $OMP_DIR config created ---"
+
+# --- Setup ~/.config/alacritty theme ---
+ALACRITTY_DIR="$USER_HOME/.config/alacritty"
+
+echo "--- Setting up $ALACRITTY_DIR config ---"
+run_cmd mkdir -p "$ALACRITTY_DIR"
+
+if [ "$DRY_RUN" = true ]; then
+    echo "[DRY RUN] Would create file: $ALACRITTY_DIR/alacritty.toml"
+else
+    cat > "$ALACRITTY_DIR/alacritty.toml" << 'EOF'
+[font]
+size = 15
+
+[general]
+import = ["/home/mmalabanan/.config/alacritty/themes/themes/catppuccin_macchiato.toml"]
+
+[cursor]
+style = { shape = "Block", blinking = "On"}
+
+[window]
+opacity = 0.95
+title = "terminal - Alacritty"
+dimensions = { columns = 155, lines = 30 }
+padding = { x = 6, y =6 }
+
+[keyboard]
+bindings = [
+    { key = "ArrowUp", mods = "Shift", mode = "~Alt", action = "ScrollHalfPageUp" },
+    { key = "ArrowDown", mods = "Shift", mode = "~Alt", action = "ScrollHalfPageDown" }
+]
+
+EOF
+fi
+
+run_cmd chown -R "$SUDO_USER:$SUDO_USER" "$ALACRITTY_DIR"
+
+echo "--- $ALACRITTY_DIR config created ---"
