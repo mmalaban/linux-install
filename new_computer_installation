@@ -185,6 +185,37 @@ fi
 
 echo "--- Installation complete ---"
 
+# --- Install Flatpak apps ---
+echo "--- Setting up Flatpak ---"
+
+if ! command -v flatpak &> /dev/null; then
+    echo "[INSTALLING] 'flatpak'..."
+    run_cmd $INSTALL_CMD flatpak
+fi
+
+if flatpak remotes | grep -q "^flathub"; then
+    echo "[SKIP] Flathub remote is already configured."
+else
+    echo "[ADDING] Flathub remote..."
+    run_cmd flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+fi
+
+flatpak_apps=(
+    "com.brave.Browser"
+    "com.obsproject.Studio"
+)
+
+for flatpak_app in "${flatpak_apps[@]}"; do
+    if flatpak list --app | grep -q "^$flatpak_app"; then
+        echo "[SKIP] '$flatpak_app' is already installed."
+    else
+        echo "[INSTALLING] '$flatpak_app' via Flatpak..."
+        run_cmd flatpak install -y flathub "$flatpak_app"
+    fi
+done
+
+echo "--- Flatpak apps installed ---"
+
 # --- Setup ~/.bashrc.d config files ---
 USER_HOME=$(eval echo ~$SUDO_USER)
 BASHRC_D="$USER_HOME/.bashrc.d"
