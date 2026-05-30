@@ -33,6 +33,7 @@ apps=(
     "git"
     "git-lfs"
     "neovim"
+    "syncthing"
     "xclip"
 )
 
@@ -93,6 +94,18 @@ if [ "$PKG_MANAGER" = "apt" ]; then
     fi
 fi
 
+# Install Tailscale via official install script
+if command -v tailscale &> /dev/null; then
+    echo "[SKIP] 'tailscale' is already installed."
+else
+    echo "[INSTALLING] 'tailscale' via official install script..."
+    if [ "$DRY_RUN" = true ]; then
+        echo "[DRY RUN] curl -fsSL https://tailscale.com/install.sh | sh"
+    else
+        curl -fsSL https://tailscale.com/install.sh | sh
+    fi
+fi
+
 # Iterate through the array
 for app in "${apps[@]}"; do
     # Check if the binary exists in the system PATH
@@ -137,6 +150,39 @@ else
     fi
 fi
 
+# Install Oh My Posh via official installer
+if command -v oh-my-posh &> /dev/null; then
+    echo "[SKIP] 'oh-my-posh' is already installed."
+else
+    echo "[INSTALLING] 'oh-my-posh' via official installer..."
+    if [ "$DRY_RUN" = true ]; then
+        echo "[DRY RUN] curl -s https://ohmyposh.dev/install.sh | bash -s -- -d /usr/local/bin"
+    else
+        curl -s https://ohmyposh.dev/install.sh | bash -s -- -d /usr/local/bin
+    fi
+fi
+
+# --- Enable persistent services ---
+echo "--- Enabling persistent services ---"
+
+if command -v syncthing &>/dev/null; then
+    if systemctl is-enabled "syncthing@$SUDO_USER" &>/dev/null; then
+        echo "[SKIP] 'syncthing@$SUDO_USER' service is already enabled."
+    else
+        echo "[ENABLING] 'syncthing@$SUDO_USER' service (persistent across reboots)..."
+        run_cmd systemctl enable --now "syncthing@$SUDO_USER"
+    fi
+fi
+
+if command -v tailscale &>/dev/null; then
+    if systemctl is-enabled tailscaled &>/dev/null; then
+        echo "[SKIP] 'tailscaled' service is already enabled."
+    else
+        echo "[ENABLING] 'tailscaled' service (persistent across reboots)..."
+        run_cmd systemctl enable --now tailscaled
+    fi
+fi
+
 echo "--- Installation complete ---"
 
 # --- Setup ~/.bashrc.d config files ---
@@ -161,6 +207,7 @@ if [ "$DRY_RUN" = true ]; then
 else
     cat > "$BASHRC_D/customize" << 'EOF'
 eval "$(fzf --bash)"
+eval "$(oh-my-posh init bash --config ~/.config/ohmyposh/theme.omp.json)"
 EOF
 fi
 
@@ -181,10 +228,8 @@ alias gs="git status"
 alias gc="git commit -m"
 alias gitinfo="git config user.name mmalabanan && git config user.email mmalaban@hotmail.com"
 alias lg="lazygit"
-# Overriding the system mkdir
-mkdir() {
-    command mkdir -p "\$1" && cd "\$1"
-}
+alias mkdir="mkdir -p"
+
 EOF
 fi
 
@@ -370,3 +415,89 @@ fi
 
 run_cmd chown -R "$SUDO_USER:$SUDO_USER" "$TMUX_DIR"
 echo "--- $TMUX_DIR config created ---"
+
+# --- Setup ~/.config/ohmyposh theme ---
+OMP_DIR="$USER_HOME/.config/ohmyposh"
+
+echo "--- Setting up $OMP_DIR config ---"
+run_cmd mkdir -p "$OMP_DIR"
+
+if [ "$DRY_RUN" = true ]; then
+    echo "[DRY RUN] Would create file: $OMP_DIR/theme.omp.json"
+else
+    cat > "$OMP_DIR/theme.omp.json" << 'EOF'
+{
+  "$schema": "https://raw.githubusercontent.com/JanDeDobbeleer/oh-my-posh/main/themes/schema.json",
+  "palette": {
+    "os": "#ACB0BE",
+    "blue":  "#8AADF4"
+  },
+  "blocks": [
+    {
+      "alignment": "left",
+      "segments": [
+         {
+          "foreground": "p:os",
+          "style": "plain",
+          "template": "{{.Icon}} ",
+          "type": "os"
+        },
+        {
+          "foreground": "p:blue",
+          "style": "plain",
+          "template": "{{ .UserName }}@{{ .HostName }} ",
+          "type": "session"
+        },
+        {
+          "foreground": "#56B6C2",
+          "options": {
+            "home_icon": "~",
+            "style": "agnoster_short"
+          },
+          "style": "plain",
+          "template": "{{ .Path }}",
+          "type": "path"
+        },
+        {
+          "foreground": "#D0666F",
+          "options": {
+            "branch_icon": "\ue725 ",
+            "cherry_pick_icon": "\ue29b ",
+            "commit_icon": "\uf417 ",
+            "fetch_status": false,
+            "fetch_upstream_icon": false,
+            "merge_icon": "\ue727 ",
+            "no_commits_icon": "\uf0c3 ",
+            "rebase_icon": "\ue728 ",
+            "revert_icon": "\uf0e2 ",
+            "tag_icon": "\uf412 "
+          },
+          "template": " <p:blue>(</>{{ .HEAD }}<p:blue>)</> ",
+          "style": "plain",
+          "type": "git"
+        }
+      ],
+      "type": "prompt"
+    },
+    {
+      "alignment": "left",
+      "newline": true,
+      "segments": [
+        {
+          "foreground": "#98C379",
+          "style": "plain",
+          "template": "  \u279c",
+          "type": "text"
+        }
+      ],
+      "type": "prompt"
+    }
+  ],
+  "final_space": true,
+  "version": 4
+}
+EOF
+fi
+
+run_cmd chown -R "$SUDO_USER:$SUDO_USER" "$OMP_DIR"
+echo "--- $OMP_DIR config created ---"
