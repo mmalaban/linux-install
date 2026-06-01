@@ -41,6 +41,7 @@ apps=(
     "syncthing"
     "xclip"
     "code"
+    "texlive-scheme-full"
 )
 
 # Detect the OS / Package Manager
