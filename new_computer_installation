@@ -21,6 +21,11 @@ run_cmd() {
     fi
 }
 
+# --- Setup repo for VS Code ----
+sudo rpm --import https://packages.microsoft.com/keys/microsoft.asc &&
+echo -e "[code]\nname=Visual Studio Code\nbaseurl=https://packages.microsoft.com/yumrepos/vscode\nenabled=1\nautorefresh=1\ntype=rpm-md\ngpgcheck=1\ngpgkey=https://packages.microsoft.com/keys/microsoft.asc" | sudo tee /etc/yum.repos.d/vscode.repo > /dev/null
+
+
 # Manually defined array of apps
 # (Add or remove names here as needed)
 apps=(
@@ -35,6 +40,7 @@ apps=(
     "neovim"
     "syncthing"
     "xclip"
+    "code"
 )
 
 # Detect the OS / Package Manager
@@ -203,6 +209,7 @@ fi
 flatpak_apps=(
     "com.brave.Browser"
     "com.obsproject.Studio"
+    "md.obsidian.Obsidian"
 )
 
 for flatpak_app in "${flatpak_apps[@]}"; do
