@@ -6,12 +6,57 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 DRY_RUN=false
-while getopts "n" opt; do
-    case $opt in
-        n) DRY_RUN=true ;;
-        *) echo "Usage: sudo $0 [-n]"; exit 1 ;;
+LATEX_INSTALL="minimal"
+LATEX_INSTALL_EXPLICIT=""
+
+usage() {
+    echo "Usage: sudo $0 [-n] [--latex-min-install|--latex-full-install]"
+}
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -n)
+            DRY_RUN=true
+            ;;
+        --latex-min-install)
+            if [ -n "$LATEX_INSTALL_EXPLICIT" ] && [ "$LATEX_INSTALL_EXPLICIT" != "minimal" ]; then
+                echo "Error: --latex-min-install and --latex-full-install are mutually exclusive."
+                exit 1
+            fi
+            LATEX_INSTALL_EXPLICIT="minimal"
+            LATEX_INSTALL="minimal"
+            ;;
+        --latex-full-install)
+            if [ -n "$LATEX_INSTALL_EXPLICIT" ] && [ "$LATEX_INSTALL_EXPLICIT" != "full" ]; then
+                echo "Error: --latex-min-install and --latex-full-install are mutually exclusive."
+                exit 1
+            fi
+            LATEX_INSTALL_EXPLICIT="full"
+            LATEX_INSTALL="full"
+            ;;
+        --)
+            shift
+            break
+            ;;
+        -*)
+            echo "Error: Unknown option: $1"
+            usage
+            exit 1
+            ;;
+        *)
+            echo "Error: Unexpected argument: $1"
+            usage
+            exit 1
+            ;;
     esac
+    shift
 done
+
+if [[ $# -gt 0 ]]; then
+    echo "Error: Unexpected argument: $1"
+    usage
+    exit 1
+fi
 
 run_cmd() {
     if [ "$DRY_RUN" = true ]; then
@@ -41,7 +86,6 @@ apps=(
     "syncthing"
     "xclip"
     "code"
-    "texlive-scheme-full"
 )
 
 # Detect the OS / Package Manager
@@ -58,6 +102,14 @@ elif command -v apt &> /dev/null; then
 else
     echo "Error: No supported package manager (dnf, apt) found on this system."
     exit 1
+fi
+
+if [ "$LATEX_INSTALL" = "full" ]; then
+    latex_packages=("texlive-scheme-full")
+    echo "--- LaTeX installation mode: full ---"
+else
+    latex_packages=("texlive-latex" "texlive-collection-basic")
+    echo "--- LaTeX installation mode: minimal ---"
 fi
 
 echo "--- Detected $PKG_MANAGER System ---"
@@ -123,6 +175,13 @@ for app in "${apps[@]}"; do
         # Execute the install command
         run_cmd $INSTALL_CMD "$app"
     fi
+done
+
+# Install LaTeX dependencies. Minimal is the default; use
+# --latex-full-install to install the complete TeX Live scheme instead.
+for latex_package in "${latex_packages[@]}"; do
+    echo "[INSTALLING] '$latex_package'..."
+    run_cmd $INSTALL_CMD "$latex_package"
 done
 
 # Install Claude Code via npm (requires Node.js and npm)
