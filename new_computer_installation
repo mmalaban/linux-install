@@ -6,7 +6,7 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 DRY_RUN=false
-LATEX_INSTALL="minimal"
+LATEX_INSTALL="none"
 LATEX_INSTALL_EXPLICIT=""
 
 usage() {
@@ -138,9 +138,12 @@ apps=(
 if [ "$LATEX_INSTALL" = "full" ]; then
     latex_packages=("texlive-scheme-full")
     echo "--- LaTeX installation mode: full ---"
-else
+elif [ "$LATEX_INSTALL" = "minimal" ]; then
     latex_packages=("texlive-latex" "texlive-collection-basic")
     echo "--- LaTeX installation mode: minimal ---"
+else
+    latex_packages=()
+    echo "--- LaTeX installation: skipped (optional; use --latex-min-install or --latex-full-install) ---"
 fi
 
 echo "--- Detected Fedora system ---"
@@ -176,8 +179,7 @@ for app in "${apps[@]}"; do
     fi
 done
 
-# Install LaTeX dependencies. Minimal is the default; use
-# --latex-full-install to install the complete TeX Live scheme instead.
+# Install LaTeX dependencies only when explicitly requested.
 for latex_package in "${latex_packages[@]}"; do
     echo "[INSTALLING] '$latex_package'..."
     run_cmd $INSTALL_CMD "$latex_package"
